@@ -1,0 +1,152 @@
+assume CS:cseg, DS:DSeg, SS:sseg 
+
+sseg segment stack
+	db 256 dup (?)
+sseg ends 
+
+dseg segment
+		OkStr	 DB 'OK','$'
+		Mode_6 = 6 ; 640 X 200, 2 colors 
+		Mode_13 = 0Dh ; 320 X 200, 16 colors 
+		Mode_14 = 0Eh ; 640 X 200, 16 colors 
+		Mode_15 = 0Fh ; 640 X 350, 2 colors 
+		Mode_16 = 10h ; 640 X 350, 16 colors 
+		Mode_17 = 11h ; 640 X 480, 2 colors 
+		Mode_18 = 12h ; 640 X 480, 16 colors 
+		Mode_19 = 13h ; 320 X 200, 256 colors 
+		Mode_6A = 6Ah ; 800 X 600, 16 colors 
+		
+		saveMode db ?; Сохранить текущий видео режим
+		currentX dw 100 ; координата X
+		currentY dw 200 ; координата Y
+		color db 10 ; номер цвета
+
+		int_0Ch dw ?, ?
+		quantity dw 40
+	
+		
+dseg ends
+
+cseg segment
+
+include OutInt.inc
+;include F.inc
+
+main:
+	mov ax, dseg
+	mov ds, ax				; load data to data segment
+	mov es, ax
+	
+	
+	; Получить текущий видео режим
+
+	mov ah,0Fh
+	int 10h
+	mov saveMode,al
+
+	; Переключиться в графический режим
+
+	mov ah,0 ; установка видео режима
+	mov al,Mode_16 ; номер режима
+	int 10h 
+	
+	
+
+	; Get OLD vector of interruption
+	mov ax, 3510h
+	int 21h
+	
+	; -------------------------------
+	
+	; Save vector of standart Program ... in RAM
+	mov int_0Ch, bx
+	mov int_0Ch + 2, es
+	; ------------------------------------------
+	jmp miss
+	
+	MyFuckingFunction proc 
+
+		;push ax
+		;push bx
+		;push cx
+		;push dx
+		
+		;mov ah, 0Ch 	 	; рисование точки
+		;mov bh,0 			; видео страница
+		mov al, color
+		xchg cx, dx	
+		;pop dx
+		;pop cx
+		;pop bx
+		;pop ax
+		;int 10h
+		;jmp dword ptr int_0Ch
+		Pushf
+		call dword ptr int_0Ch
+		;int 10h
+		iret
+	MyFuckingFunction endp
+	
+	jmp endsss
+	
+miss:
+	; Put our vector in table of interruption without using 21h
+	cli         			; запретить внешние прерывания
+	push ds    				; сохранить DS
+	push cs
+	pop ds   				; (CS)-> DS
+	lea dx, MyFuckingFunction
+	mov ax, 2510h
+	int 21h
+	pop ds     				;восстановить DS
+	sti          			; разрешить прерывания
+	;---------------------------------------------------------------
+	
+	
+	paint:
+		mov dx, currentY
+		mov ah, 0Ch 	 	; рисование точки
+		mov al, 13 		; цвет точки
+		mov bh,0 			; видео страница
+		mov cx,currentX
+		int 10h
+		inc currentX
+		dec quantity
+		cmp quantity, 0
+		jg paint
+	
+
+	endsss:
+	
+
+
+	
+	; Come back of old vector in the table
+	cli
+	push ds
+	mov dx, int_0Ch
+	mov ds, int_0Ch + 2
+	mov ax, 2510h
+	int 21h
+	pop ds
+	sti  
+	;---------------------------------------------------------------
+
+	
+	; Ожидаем нажатия клавиши
+	mov ah,0
+	int 16h
+	
+	; Возврат в прежний видео режим
+	mov ah,0 ; установить видео режим 
+	mov al,saveMode ; сохраненный видео режим
+	int 10h 
+	
+	
+	
+	; Выход из программы
+	MOV ax, 4c00h
+	INT 21h	
+
+cseg ends
+end main

@@ -1,0 +1,1 @@
+C:\DOS\BP\bin\td %1.com
